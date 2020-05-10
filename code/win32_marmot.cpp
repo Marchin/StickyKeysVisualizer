@@ -1,25 +1,19 @@
 #include <windows.h>
-#include <uxtheme.h>
-#include <stdint.h>
-
 #define internal static
 #define local_persist static
 #define global static
 
-typedef uint8_t  u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-typedef int8_t   s8;
-typedef int16_t  s16;
-typedef int32_t  s32;
-typedef int64_t  s64;
-typedef s8       b8;
-typedef s32      b32;
-typedef float    f32;
-typedef double   f64;
+typedef char u8;
+typedef unsigned int u32;
 
-#define ARRAY_COUNT(array) (sizeof(array)/sizeof((array)[0]))
+const u32 keyRectCount = 4;
+const u32 keyRectWidth = 20;
+const u32 keyRectHeight = 20;
+const u32 keyRectToggledHeight = 40;
+const u32 winColor = 0xffffff;
+const u32 ctrlColor = 0xff0000;
+const u32 shiftColor = 0x00ff00;
+const u32 altColor = 0x0000ff;
 
 struct Win32OffscreenBuffer {
     // NOTE(Marchin): pixels are little endinan, 32-bit wide (RGB + padding)
@@ -36,10 +30,9 @@ struct Win32WindowDimension {
     int height;
 };
 
-// NOTE(Marchin): static initializes it to 0
 global Win32OffscreenBuffer gBackBuffer;
 
-internal Win32WindowDimension
+inline Win32WindowDimension
 getWindowDimension(HWND window) {
     Win32WindowDimension result;
     RECT clientRect;
@@ -49,9 +42,9 @@ getWindowDimension(HWND window) {
     return result;
 }
 
-internal void
+inline void
 win32ResizeDIBSection(Win32OffscreenBuffer* pBackBuffer,
-                      s32 width, s32 height) {
+                      int width, int height) {
     if (pBackBuffer->pMemory) {
         VirtualFree(pBackBuffer->pMemory, 0, MEM_RELEASE);
     }
@@ -66,15 +59,15 @@ win32ResizeDIBSection(Win32OffscreenBuffer* pBackBuffer,
     pBackBuffer->info.bmiHeader.biPlanes = 1;
     pBackBuffer->info.bmiHeader.biBitCount = 32;
     pBackBuffer->info.bmiHeader.biCompression = BI_RGB;
-    s32 bitmapMemorySize = (pBackBuffer->width * pBackBuffer->height) * pBackBuffer->bytesPerPixel;
+    int bitmapMemorySize = (pBackBuffer->width * pBackBuffer->height) * pBackBuffer->bytesPerPixel;
     pBackBuffer->pMemory = VirtualAlloc(0, bitmapMemorySize, MEM_COMMIT,PAGE_READWRITE);
     pBackBuffer->pitch = width * pBackBuffer->bytesPerPixel;
 }
 
-internal void
+inline void
 win32DisplayBufferInWindow(Win32OffscreenBuffer* pBackBuffer,
                            HDC deviceContext,
-                           s32 windowWidth, s32 windowHeight) {
+                           int windowWidth, int windowHeight) {
     if ((windowWidth >= pBackBuffer->width*2) &&
         (windowHeight >= pBackBuffer->height*2)) {
         
@@ -99,25 +92,21 @@ win32DisplayBufferInWindow(Win32OffscreenBuffer* pBackBuffer,
     }
 }
 
-internal void
+inline void
 win32ProcessPendingMessages() {
     MSG message;
     while (PeekMessageA(&message, 0, 0, 0, PM_REMOVE)){
         switch(message.message) {
-            case WM_SYSKEYDOWN: {
-            }break;
-            case WM_SYSKEYUP: {
-            }break;
-            case WM_KEYDOWN: {
-            }break;
-            case WM_KEYUP: {
-            }break;
+            case WM_SYSKEYDOWN:
+            case WM_SYSKEYUP:
+            case WM_KEYDOWN:
+            case WM_KEYUP:
             case WM_QUIT: {
-            }break;
+            } break;
             default: {
                 DispatchMessageA(&message);
                 TranslateMessage(&message);
-            }
+            } break;
         }
     }
 }
@@ -129,24 +118,6 @@ Win32MainWindowCallback(HWND   window,
                         LPARAM lParam) {
     LRESULT result = 0;
     switch(message) {
-        case WM_NCCALCSIZE: {
-        }break;
-        case WM_SIZE:{
-        }break;
-        case WM_DESTROY: {
-        }break;
-        case WM_CLOSE: {
-        }break;
-        case WM_ACTIVATEAPP:{
-        }break;
-        case WM_SYSKEYDOWN: {
-        }break;
-        case WM_SYSKEYUP: {
-        }break;
-        case WM_KEYDOWN: {
-        }break;
-        case WM_KEYUP: {
-        }break;
         case WM_PAINT: {
             PAINTSTRUCT paint;
             HDC deviceContext = BeginPaint(window, &paint);
@@ -154,32 +125,41 @@ Win32MainWindowCallback(HWND   window,
             win32DisplayBufferInWindow(&gBackBuffer, deviceContext, dimension.width,
                                        dimension.height);
             EndPaint(window, &paint);
-        }break;
-        case WM_SETCURSOR: {
-        }break;
+        } break;
+        case WM_NCCALCSIZE:
+        case WM_SIZE:
+        case WM_DESTROY:
+        case WM_CLOSE:
+        case WM_ACTIVATEAPP:
+        case WM_SYSKEYDOWN:
+        case WM_SYSKEYUP:
+        case WM_KEYDOWN:
+        case WM_KEYUP:
+        case WM_SETCURSOR:{
+        } break;
         default: {
             result = DefWindowProcA(window, message, wParam, lParam);
-            break;
-        }
+        } break;
     }
     return result;
 }
 
-internal void
+inline void
 win32DebugDrawRect(Win32OffscreenBuffer* pBackBuffer,
-                   s32 left, s32 top,
-                   s32 width, s32 height,
+                   int left, int top,
+                   int width, int height,
                    u32 color) {
     if (left <= 0 ) { left = 0; }
     if (top <= 0 ) { top = 0; }
     if (left + width > pBackBuffer->width) { width = pBackBuffer->width - left; }
     if (top + height > pBackBuffer->height) { height = pBackBuffer->height - top; }
     
-    s32 right = left + width;
-    s32 bottom = top + height;
-    for (s32 y = top; y < bottom; ++y) {
-        u8* pPixel = (u8*)pBackBuffer->pMemory + left*pBackBuffer->bytesPerPixel + y*pBackBuffer->pitch;
-        for (s32 x = left; x < right; ++x) {
+    int right = left + width;
+    int bottom = top + height;
+    for (int y = top; y < bottom; ++y) {
+        u8* pPixel = (u8*)pBackBuffer->pMemory +
+            left*pBackBuffer->bytesPerPixel + y*pBackBuffer->pitch;
+        for (int x = left; x < right; ++x) {
             *(u32*)pPixel = color;
             pPixel += pBackBuffer->bytesPerPixel;
         }
@@ -187,17 +167,12 @@ win32DebugDrawRect(Win32OffscreenBuffer* pBackBuffer,
     }
 }
 
-const u32 keyRectCount = 4;
-const u32 keyRectWidth = 20;
-const u32 keyRectHeight = 20;
-const u32 keyRectToggledHeight = 40;
-
-s32 CALLBACK
+int CALLBACK
 WinMain(HINSTANCE instance,
         HINSTANCE prevInstance,
         LPSTR pCmdLine,
-        s32 cmdShow) {
-    s32 totalWidth = keyRectWidth*keyRectCount;
+        int cmdShow) {
+    int totalWidth = keyRectWidth*keyRectCount;
     
     WNDCLASSA windowClass = {};
     win32ResizeDIBSection(&gBackBuffer, totalWidth, keyRectToggledHeight);
@@ -205,7 +180,6 @@ WinMain(HINSTANCE instance,
     windowClass.lpfnWndProc = Win32MainWindowCallback;
     windowClass.hInstance = instance;
     windowClass.hCursor = LoadCursor(0, IDC_ARROW);
-    // windowClass.hIcon = ;
     windowClass.lpszClassName = "MarmotEngineWindowClass";
     if (RegisterClassA(&windowClass)){
         HWND window = CreateWindowExA(WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW,
@@ -220,13 +194,13 @@ WinMain(HINSTANCE instance,
                                       0);
         if (window) {
             HDC refreshDC = GetDC(window);
-            s32 monitorRefreshRate = 60;
-            s32 win32RefreshRate = GetDeviceCaps(refreshDC, VREFRESH);
+            int monitorRefreshRate = 60;
+            int win32RefreshRate = GetDeviceCaps(refreshDC, VREFRESH);
             if (win32RefreshRate > 1) {
                 monitorRefreshRate = win32RefreshRate;
             }
-            f32 gameUpdateHz = (monitorRefreshRate / 2.f);
-            f32 targetSecondsPerFrame = 1.f / gameUpdateHz;
+            float gameUpdateHz = (monitorRefreshRate / 2.f);
+            float targetSecondsPerFrame = 1.f / gameUpdateHz;
             ReleaseDC(window, refreshDC);
             MONITORINFO mi = { sizeof(mi) };
             GetMonitorInfo(MonitorFromWindow(window,
@@ -238,12 +212,10 @@ WinMain(HINSTANCE instance,
                          totalWidth,
                          keyRectToggledHeight,
                          SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-            SetWindowTheme(window, L" ", L" ");
             SetLayeredWindowAttributes(window, RGB(0, 0, 0), 0, LWA_COLORKEY);
             
             
             while (true) {
-                
                 win32ProcessPendingMessages();
                 
                 STICKYKEYS stickyInfo = { sizeof(STICKYKEYS), 0 };
@@ -251,11 +223,7 @@ WinMain(HINSTANCE instance,
                 
                 win32DebugDrawRect(&gBackBuffer, 0, 0, totalWidth, keyRectToggledHeight, 0);
                 if (stickyInfo.dwFlags & SKF_STICKYKEYSON) {
-                    s32 xOffset = 0;
-                    const u32 winColor = 0xffffff;
-                    const u32 ctrlColor = 0xff0000;
-                    const u32 shiftColor = 0x00ff00;
-                    const u32 altColor = 0x0000ff;
+                    int xOffset = 0;
                     if (stickyInfo.dwFlags & (SKF_LSHIFTLOCKED | SKF_RSHIFTLOCKED)) {
                         win32DebugDrawRect(&gBackBuffer,
                                            xOffset, 0,
@@ -318,9 +286,7 @@ WinMain(HINSTANCE instance,
                 win32DisplayBufferInWindow(&gBackBuffer, deviceContext,
                                            dimension.width, dimension.height);
                 ReleaseDC(window, deviceContext);
-                
             }
-            
         }
     }
     return 0;
