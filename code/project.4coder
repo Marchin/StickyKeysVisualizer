@@ -30,7 +30,7 @@ command_list = {
 	.footer_panel = true,
 	.save_dirty_files = false,
 	.cursor_at_end = true,
-	.cmd = {{"..\\build\\win32_marmot", .os = "win"},},
+	.cmd = {{"..\\build\\MarmotStickyKeys", .os = "win"},},
   },
   { .name = "setup",
 	.out = "*compilation*",

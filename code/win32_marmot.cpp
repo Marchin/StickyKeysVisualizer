@@ -1,26 +1,43 @@
-#include "marmot_platform.h"
 #include <windows.h>
-#include "win32_marmot.h"
-
-#include <malloc.h>
-#include <stdio.h>
 #include <uxtheme.h>
-#include <dwmapi.h>
+#include <stdint.h>
+
+#define internal static
+#define local_persist static
+#define global static
+
+typedef uint8_t  u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
+typedef int8_t   s8;
+typedef int16_t  s16;
+typedef int32_t  s32;
+typedef int64_t  s64;
+typedef s8       b8;
+typedef s32      b32;
+typedef float    f32;
+typedef double   f64;
+
+#define ARRAY_COUNT(array) (sizeof(array)/sizeof((array)[0]))
+
+struct Win32OffscreenBuffer {
+    // NOTE(Marchin): pixels are little endinan, 32-bit wide (RGB + padding)
+    BITMAPINFO info;
+    void* pMemory;
+    int width;
+    int height;
+    int pitch;
+    int bytesPerPixel;
+};
+
+struct Win32WindowDimension {
+    int width;
+    int height;
+};
 
 // NOTE(Marchin): static initializes it to 0
-global b32 gRunning;
-global b32 gPause;
 global Win32OffscreenBuffer gBackBuffer;
-global s64 gPerfCountFrequency;
-global WINDOWPLACEMENT gWindowPosition = { sizeof(gWindowPosition) };
-
-internal void
-win32ProcessKeyboardMessage(GameButtonState* pNewState, b32 isDown) {
-    if (pNewState->endedDown != isDown) {
-        pNewState->endedDown = isDown;
-        ++pNewState->halfTransitionCount;
-    }
-}
 
 internal Win32WindowDimension
 getWindowDimension(HWND window) {
@@ -83,20 +100,7 @@ win32DisplayBufferInWindow(Win32OffscreenBuffer* pBackBuffer,
 }
 
 internal void
-win32ProcessKeys(GameControllerInput* pKeyboardController,
-                 WPARAM wParam, LPARAM lParam) {
-    u32 vkCode = (u32)wParam;
-    b32 wasDown = ((lParam & (1 << 30)) != 0);
-    b32 isDown = ((lParam & (1 << 31)) == 0);
-    if (wasDown != isDown) {
-        if (vkCode == VK_ESCAPE) {
-            gRunning = false;
-        }
-    }
-}
-
-internal void
-win32ProcessPendingMessages(GameControllerInput* pKeyboardController) {
+win32ProcessPendingMessages() {
     MSG message;
     while (PeekMessageA(&message, 0, 0, 0, PM_REMOVE)){
         switch(message.message) {
@@ -105,15 +109,10 @@ win32ProcessPendingMessages(GameControllerInput* pKeyboardController) {
             case WM_SYSKEYUP: {
             }break;
             case WM_KEYDOWN: {
-                win32ProcessKeys(pKeyboardController,
-                                 message.wParam, message.lParam);
             }break;
             case WM_KEYUP: {
-                win32ProcessKeys(pKeyboardController,
-                                 message.wParam, message.lParam);
             }break;
             case WM_QUIT: {
-                gRunning = false;
             }break;
             default: {
                 DispatchMessageA(&message);
@@ -131,26 +130,14 @@ Win32MainWindowCallback(HWND   window,
     LRESULT result = 0;
     switch(message) {
         case WM_NCCALCSIZE: {
-            MARGINS m = { 0, 0, 0, 0 };
-            
-            DwmExtendFrameIntoClientArea(window, &m);
         }break;
         case WM_SIZE:{
         }break;
         case WM_DESTROY: {
-            gRunning = false;
         }break;
         case WM_CLOSE: {
-            gRunning = false;
         }break;
         case WM_ACTIVATEAPP:{
-#if 0
-            if (wParam == TRUE) {
-                SetLayeredWindowAttributes(window, RGB(0, 0, 0), 255, LWA_ALPHA);
-            } else {
-                SetLayeredWindowAttributes(window, RGB(0, 0, 0), 128, LWA_ALPHA);
-            }
-#endif
         }break;
         case WM_SYSKEYDOWN: {
         }break;
@@ -159,7 +146,6 @@ Win32MainWindowCallback(HWND   window,
         case WM_KEYDOWN: {
         }break;
         case WM_KEYUP: {
-            ASSERT(!"Keyboard input came through non-dispatch message");
         }break;
         case WM_PAINT: {
             PAINTSTRUCT paint;
@@ -170,26 +156,12 @@ Win32MainWindowCallback(HWND   window,
             EndPaint(window, &paint);
         }break;
         case WM_SETCURSOR: {
-            SetCursor(0);
         }break;
         default: {
             result = DefWindowProcA(window, message, wParam, lParam);
             break;
         }
     }
-    return result;
-}
-
-inline LARGE_INTEGER
-win32GetWallClock() {
-    LARGE_INTEGER result;
-    QueryPerformanceCounter(&result);
-    return result;
-}
-
-inline f32
-win32GetSecondsElapsed(LARGE_INTEGER start, LARGE_INTEGER end) {
-    f32 result = ((f32)(end.QuadPart - start.QuadPart)/(f32)gPerfCountFrequency);
     return result;
 }
 
@@ -225,14 +197,6 @@ WinMain(HINSTANCE instance,
         HINSTANCE prevInstance,
         LPSTR pCmdLine,
         s32 cmdShow) {
-    LARGE_INTEGER perfCountFrequencyResult;
-    QueryPerformanceFrequency(&perfCountFrequencyResult);
-    gPerfCountFrequency = perfCountFrequencyResult.QuadPart;
-    
-    // NOTE(Marchin): sets the scheduler granularity so Sleep can be more granular
-    UINT desiredSchedulerMS = 1;
-    b32 sleepIsGranular = (timeBeginPeriod(desiredSchedulerMS) == TIMERR_NOERROR);
-    
     s32 totalWidth = keyRectWidth*keyRectCount;
     
     WNDCLASSA windowClass = {};
@@ -244,7 +208,7 @@ WinMain(HINSTANCE instance,
     // windowClass.hIcon = ;
     windowClass.lpszClassName = "MarmotEngineWindowClass";
     if (RegisterClassA(&windowClass)){
-        HWND window = CreateWindowExA(WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT,
+        HWND window = CreateWindowExA(WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW,
                                       windowClass.lpszClassName,
                                       "Marmot Engine",
                                       WS_VISIBLE,
@@ -277,50 +241,10 @@ WinMain(HINSTANCE instance,
             SetWindowTheme(window, L" ", L" ");
             SetLayeredWindowAttributes(window, RGB(0, 0, 0), 0, LWA_COLORKEY);
             
-            u64 lastCycleCount = __rdtsc();
             
-            LARGE_INTEGER lastCounter = win32GetWallClock();
-            
-            LARGE_INTEGER flipWallClock = {};
-            
-            GameInput input[2] = {};
-            GameInput* pNewInput = &input[0];
-            GameInput* pOldInput = &input[1];
-            
-            gRunning = true;
-            pNewInput->executableReloaded = false;
-            while (gRunning) {
-                pNewInput->deltaTime = targetSecondsPerFrame;
-                GameControllerInput* pOldKeyboardControl = getController(pOldInput, 0);
-                GameControllerInput* pNewKeyboardControl = getController(pNewInput, 0);
-                (*pNewKeyboardControl) = {};
-                pNewKeyboardControl->isConnected = true;
-                for (s32 iButton = 0;
-                     iButton < ARRAY_COUNT(pNewKeyboardControl->buttons);
-                     ++iButton){
-                    
-                    pNewKeyboardControl->buttons[iButton].endedDown =
-                        pOldKeyboardControl->buttons[iButton].endedDown;
-                }
+            while (true) {
                 
-                win32ProcessPendingMessages(pNewKeyboardControl);
-                
-                POINT mousePos;
-                GetCursorPos(&mousePos);
-                ScreenToClient(window, &mousePos);
-                pNewInput->mouseX = mousePos.x;
-                pNewInput->mouseY = mousePos.y;
-                pNewInput->mouseZ = 0;
-                win32ProcessKeyboardMessage(&pNewInput->mouseButtons[0],
-                                            GetKeyState(VK_LBUTTON) & (1 << 15));
-                win32ProcessKeyboardMessage(&pNewInput->mouseButtons[1],
-                                            GetKeyState(VK_RBUTTON) & (1 << 15));
-                win32ProcessKeyboardMessage(&pNewInput->mouseButtons[2],
-                                            GetKeyState(VK_MBUTTON) & (1 << 15));
-                win32ProcessKeyboardMessage(&pNewInput->mouseButtons[3],
-                                            GetKeyState(VK_XBUTTON1) & (1 << 15));
-                win32ProcessKeyboardMessage(&pNewInput->mouseButtons[4],
-                                            GetKeyState(VK_XBUTTON2) & (1 << 15));
+                win32ProcessPendingMessages();
                 
                 STICKYKEYS stickyInfo = { sizeof(STICKYKEYS), 0 };
                 SystemParametersInfoA(SPI_GETSTICKYKEYS, sizeof(STICKYKEYS), &stickyInfo, 0);
@@ -387,49 +311,14 @@ WinMain(HINSTANCE instance,
                     }
                 }
                 
-                if(!gPause) {
-                    // NOTE(Marchin): swap buffers
-                    GameInput* temp = pNewInput;
-                    pNewInput = pOldInput;
-                    pOldInput = temp;
-                    
-                    LARGE_INTEGER workCounter = win32GetWallClock();
-                    f32 workSecondsElapsed = win32GetSecondsElapsed(lastCounter,
-                                                                    workCounter);
-                    f32 secondsElapsedForFrame = workSecondsElapsed;
-                    
-                    if (secondsElapsedForFrame < targetSecondsPerFrame) {
-                        if (sleepIsGranular) {
-                            DWORD sleepMS = DWORD(900.f * (targetSecondsPerFrame -
-                                                           secondsElapsedForFrame));
-                            if (sleepMS > 0) {
-                                Sleep(sleepMS);
-                            }
-                        }
-                        f32 testSecondsElapsedForFrame =
-                            win32GetSecondsElapsed(lastCounter, win32GetWallClock());
-                        if (testSecondsElapsedForFrame < targetSecondsPerFrame) {
-                            // NOTE(Marchin): Miss sleep
-                        }
-                        while (secondsElapsedForFrame < targetSecondsPerFrame) {
-                            secondsElapsedForFrame = win32GetSecondsElapsed(lastCounter,
-                                                                            win32GetWallClock());
-                        }
-                    } else {
-                        // TODO(Marchin): MISSED FRAME RATE
-                    }
-                    LARGE_INTEGER endCounter = win32GetWallClock();
-                    f32 msPerFrame = (f32)(1000.f*win32GetSecondsElapsed(lastCounter,
-                                                                         endCounter));
-                    lastCounter = endCounter;
-                    
-                    Win32WindowDimension dimension = getWindowDimension(window);
-                    HDC deviceContext = GetDC(window);
-                    win32DisplayBufferInWindow(&gBackBuffer, deviceContext,
-                                               dimension.width, dimension.height);
-                    ReleaseDC(window, deviceContext);
-                    
-                }
+                Sleep(100);
+                
+                Win32WindowDimension dimension = getWindowDimension(window);
+                HDC deviceContext = GetDC(window);
+                win32DisplayBufferInWindow(&gBackBuffer, deviceContext,
+                                           dimension.width, dimension.height);
+                ReleaseDC(window, deviceContext);
+                
             }
             
         }
