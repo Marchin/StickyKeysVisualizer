@@ -1,0 +1,70 @@
+version(1);
+
+project_name = "StickyKeys"
+
+patterns = {
+	"*.cpp",
+	"*.h",
+};
+
+patterns = {
+	".*"
+};
+
+load_paths = {
+	{{
+		{".", .relative = true, .recursive = true,}
+	}, .os ="win"},
+};
+
+command_list = {
+  { .name = "build",
+	.out = "*compilation*",
+	.footer_panel = true,
+	.save_dirty_files = true,
+	.cursor_at_end = true,
+	.cmd = {{"..\\misc\\build.bat", .os = "win"},},
+  },
+  { .name = "run",
+	.out = "*run*",
+	.footer_panel = true,
+	.save_dirty_files = false,
+	.cursor_at_end = true,
+	.cmd = {{"..\\build\\win32_marmot", .os = "win"},},
+  },
+  { .name = "setup",
+	.out = "*compilation*",
+	.footer_panel = false,
+	.save_dirty_files = true,
+	.cursor_at_end = false,
+	.cmd = {{"..\\misc\\shell.bat", .os = "win"},},
+  },
+  { .name = "vs",
+	.out = "",
+	.footer_panel = false,
+	.save_dirty_files = true,
+	.cursor_at_end = false,
+	.cmd = {{"devenv ..\\build\\win32_marmot.exe", .os = "win"},},
+  },
+  { .name = "vscode",
+	.out = "",
+	.footer_panel = false,
+	.save_dirty_files = true,
+	.cursor_at_end = false,
+	.cmd = {{"code", .os = "win"},},
+  },
+  { .name = "remedybg",
+	.out = "",
+	.footer_panel = false,
+	.save_dirty_files = true,
+	.cursor_at_end = false,
+	.cmd = {{"start /max W:\remedybg.exe W:\MarmotEngine\marmot_debug.rdbg ", .os = "win"},},
+  },
+};
+
+fkey_command[1] = "setup";
+fkey_command[4] = "build";
+fkey_command[5] = "run";
+fkey_command[7] = "remedybg";
+fkey_command[10] = "vs";
+fkey_command[11] = "vscode";
