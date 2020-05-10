@@ -68,28 +68,11 @@ inline void
 win32DisplayBufferInWindow(Win32OffscreenBuffer* pBackBuffer,
                            HDC deviceContext,
                            int windowWidth, int windowHeight) {
-    if ((windowWidth >= pBackBuffer->width*2) &&
-        (windowHeight >= pBackBuffer->height*2)) {
-        
-        StretchDIBits(deviceContext,
-                      0, 0, 2*pBackBuffer->width, 2*pBackBuffer->height,
-                      0, 0, pBackBuffer->width, pBackBuffer->height,
-                      pBackBuffer->pMemory, &pBackBuffer->info,
-                      DIB_RGB_COLORS, SRCCOPY);
-    } else {
-        PatBlt(deviceContext, 0, 0, windowWidth, 0, BLACKNESS);
-        PatBlt(deviceContext, 0, pBackBuffer->height,
-               windowWidth, windowHeight, BLACKNESS);
-        PatBlt(deviceContext, 0, 0, 0, windowHeight, BLACKNESS);
-        PatBlt(deviceContext, pBackBuffer->width, 0,
-               windowWidth, windowHeight, BLACKNESS);
-        
-        StretchDIBits(deviceContext,
-                      0, 0, pBackBuffer->width, pBackBuffer->height,
-                      0, 0, pBackBuffer->width, pBackBuffer->height,
-                      pBackBuffer->pMemory, &pBackBuffer->info,
-                      DIB_RGB_COLORS, SRCCOPY);
-    }
+    StretchDIBits(deviceContext,
+                  0, 0, pBackBuffer->width, pBackBuffer->height,
+                  0, 0, pBackBuffer->width, pBackBuffer->height,
+                  pBackBuffer->pMemory, &pBackBuffer->info,
+                  DIB_RGB_COLORS, SRCCOPY);
 }
 
 inline void
