@@ -5,6 +5,7 @@ project_name = "StickyKeys"
 patterns = {
 	"*.cpp",
 	"*.h",
+	"*.bat",
 };
 
 patterns = {
@@ -13,7 +14,8 @@ patterns = {
 
 load_paths = {
 	{{
-		{".", .relative = true, .recursive = true,}
+		{"../code", .relative = true, .recursive = true,},
+		{"../misc", .relative = true, .recursive = true,}
 	}, .os ="win"},
 };
 
