@@ -14,7 +14,7 @@ const u32 keyRectToggledHeight = 2;
 const u32 totalWidth = keyRectWidth*keyRectCount;
 const u32 totalWidthScaled = totalWidth*keyRectScale;
 const u32 totalHeightScaled = keyRectToggledHeight*keyRectScale;
-const u32 winColor = 0xffffff;
+const u32 winColor = 0xffff00;
 const u32 ctrlColor = 0xff0000;
 const u32 shiftColor = 0x00ff00;
 const u32 altColor = 0x0000ff;
@@ -158,110 +158,119 @@ WinMain(HINSTANCE instance,
         HINSTANCE prevInstance,
         LPSTR pCmdLine,
         int cmdShow) {
-    WNDCLASSA windowClass = {};
-    win32ResizeDIBSection(&gBackBuffer, totalWidth, keyRectToggledHeight);
-    windowClass.style = CS_HREDRAW|CS_VREDRAW;
-    windowClass.lpfnWndProc = Win32MainWindowCallback;
-    windowClass.hInstance = instance;
-    windowClass.hCursor = LoadCursor(0, IDC_ARROW);
-    windowClass.lpszClassName = "MarmotEngineWindowClass";
-    if (RegisterClassA(&windowClass)) {
-        HWND window = CreateWindowExA(WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW,
-                                      windowClass.lpszClassName,
-                                      "Marmot Engine",
-                                      WS_VISIBLE,
-                                      0, 0,
-                                      totalWidth, keyRectToggledHeight,
-                                      0,
-                                      0,
-                                      instance,
-                                      0);
-        if (window) {
-            {
-                MONITORINFO mi = { sizeof(mi) };
-                GetMonitorInfo(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &mi);
-                
-                SetWindowPos(window, HWND_TOP,
-                             mi.rcMonitor.right - mi.rcMonitor.left - totalWidthScaled,
-                             0,
-                             totalWidthScaled, totalHeightScaled,
-                             SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-                SetLayeredWindowAttributes(window, RGB(0, 0, 0), 0, LWA_COLORKEY);
-            }
-            while (true) {
-                {
-                    win32ProcessPendingMessages();
-                    
-                    STICKYKEYS stickyInfo = { sizeof(STICKYKEYS), 0 };
-                    SystemParametersInfoA(SPI_GETSTICKYKEYS, sizeof(STICKYKEYS), &stickyInfo, 0);
-                    
-                    win32DebugDrawRect(&gBackBuffer, 0, 0, totalWidth, keyRectToggledHeight, 0);
-                    if (stickyInfo.dwFlags & SKF_STICKYKEYSON) {
-                        int xOffset = 0;
-                        if (stickyInfo.dwFlags & (SKF_LSHIFTLATCHED | SKF_RSHIFTLATCHED)) {
-                            win32DebugDrawRect(&gBackBuffer,
-                                               xOffset, 0,
-                                               keyRectWidth, keyRectHeight,
-                                               shiftColor);
-                        } else if (stickyInfo.dwFlags & (SKF_LSHIFTLOCKED | SKF_RSHIFTLOCKED)) {
-                            win32DebugDrawRect(&gBackBuffer,
-                                               xOffset, 0,
-                                               keyRectWidth, keyRectToggledHeight,
-                                               shiftColor);
-                        }
-                        
-                        xOffset += keyRectWidth;
-                        
-                        if (stickyInfo.dwFlags & (SKF_LCTLLATCHED | SKF_RCTLLATCHED)) {
-                            win32DebugDrawRect(&gBackBuffer,
-                                               xOffset, 0,
-                                               keyRectWidth, keyRectHeight,
-                                               ctrlColor);
-                        } else if (stickyInfo.dwFlags & (SKF_LCTLLOCKED | SKF_RCTLLOCKED)) {
-                            win32DebugDrawRect(&gBackBuffer,
-                                               xOffset, 0,
-                                               keyRectWidth, keyRectToggledHeight,
-                                               ctrlColor);
-                        }
-                        
-                        xOffset += keyRectWidth;
-                        
-                        if (stickyInfo.dwFlags & (SKF_LWINLATCHED | SKF_RWINLATCHED)) {
-                            win32DebugDrawRect(&gBackBuffer,
-                                               xOffset, 0,
-                                               keyRectWidth, keyRectHeight,
-                                               winColor);
-                        } else if (stickyInfo.dwFlags & (SKF_LWINLOCKED | SKF_RWINLOCKED)) {
-                            win32DebugDrawRect(&gBackBuffer,
-                                               xOffset, 0,
-                                               keyRectWidth, keyRectToggledHeight,
-                                               winColor);
-                        }
-                        
-                        xOffset += keyRectWidth;
-                        
-                        if (stickyInfo.dwFlags & (SKF_LALTLATCHED | SKF_RALTLATCHED)) {
-                            win32DebugDrawRect(&gBackBuffer,
-                                               xOffset, 0,
-                                               keyRectWidth, keyRectHeight,
-                                               altColor);
-                        } else if (stickyInfo.dwFlags & (SKF_LALTLOCKED | SKF_RALTLOCKED)) {
-                            win32DebugDrawRect(&gBackBuffer,
-                                               xOffset, 0,
-                                               keyRectWidth, keyRectToggledHeight,
-                                               altColor);
-                        }
-                    }
-                    
-                    Win32WindowDimension dimension = getWindowDimension(window);
-                    HDC deviceContext = GetDC(window);
-                    win32DisplayBufferInWindow(&gBackBuffer, deviceContext, 
-                                               dimension.width, dimension.height);
-                    ReleaseDC(window, deviceContext);
-                }
-                Sleep(100);
-            }
+    HWND window = {};
+    {
+        WNDCLASSA windowClass = {};
+        win32ResizeDIBSection(&gBackBuffer, totalWidth, keyRectToggledHeight);
+        windowClass.style = CS_HREDRAW|CS_VREDRAW;
+        windowClass.lpfnWndProc = Win32MainWindowCallback;
+        windowClass.hInstance = instance;
+        windowClass.hCursor = LoadCursor(0, IDC_ARROW);
+        windowClass.lpszClassName = "MarmotEngineWindowClass";
+        if (RegisterClassA(&windowClass)) {
+            window = CreateWindowExA(WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW,
+                                     windowClass.lpszClassName,
+                                     "Marmot Engine",
+                                     WS_VISIBLE,
+                                     0, 0,
+                                     totalWidth, keyRectToggledHeight,
+                                     0,
+                                     0,
+                                     instance,
+                                     0);
         }
     }
+    if (window) {
+        {
+            MONITORINFO mi = { sizeof(mi) };
+            GetMonitorInfo(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &mi);
+            
+            SetWindowPos(window, HWND_TOP,
+                         mi.rcMonitor.right - mi.rcMonitor.left - totalWidthScaled,
+                         0,
+                         totalWidthScaled, totalHeightScaled,
+                         SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+            SetLayeredWindowAttributes(window, RGB(0, 0, 0), 0, LWA_COLORKEY);
+        }
+        while (true) {
+            {
+                win32ProcessPendingMessages();
+                
+                STICKYKEYS stickyInfo = { sizeof(STICKYKEYS), 0 };
+                SystemParametersInfoA(SPI_GETSTICKYKEYS, sizeof(STICKYKEYS), &stickyInfo, 0);
+                
+                win32DebugDrawRect(&gBackBuffer, 0, 0, totalWidth, keyRectToggledHeight, 0);
+                if (stickyInfo.dwFlags & SKF_STICKYKEYSON) {
+                    int xOffset = 0;
+                    if (stickyInfo.dwFlags & (SKF_LSHIFTLOCKED | SKF_RSHIFTLOCKED)) {
+                        win32DebugDrawRect(&gBackBuffer,
+                                           xOffset, 0,
+                                           keyRectWidth, keyRectToggledHeight,
+                                           shiftColor);
+                    } else if (stickyInfo.dwFlags & (SKF_LSHIFTLATCHED | SKF_RSHIFTLATCHED)) {
+                        win32DebugDrawRect(&gBackBuffer,
+                                           xOffset, 0,
+                                           keyRectWidth, keyRectHeight,
+                                           shiftColor);
+                    }
+                    
+                    xOffset += keyRectWidth;
+                    
+                    if (stickyInfo.dwFlags & (SKF_LCTLLOCKED | SKF_RCTLLOCKED)) {
+                        win32DebugDrawRect(&gBackBuffer,
+                                           xOffset, 0,
+                                           keyRectWidth, keyRectToggledHeight,
+                                           ctrlColor);
+                    } else if (stickyInfo.dwFlags & (SKF_LCTLLATCHED | SKF_RCTLLATCHED)) {
+                        win32DebugDrawRect(&gBackBuffer,
+                                           xOffset, 0,
+                                           keyRectWidth, keyRectHeight,
+                                           ctrlColor);
+                    } 
+                    
+                    xOffset += keyRectWidth;
+                    
+                    if (stickyInfo.dwFlags & (SKF_LWINLOCKED | SKF_RWINLOCKED)) {
+                        win32DebugDrawRect(&gBackBuffer,
+                                           xOffset, 0,
+                                           keyRectWidth, keyRectToggledHeight,
+                                           winColor);
+                    } else if (stickyInfo.dwFlags & (SKF_LWINLATCHED | SKF_RWINLATCHED)) {
+                        win32DebugDrawRect(&gBackBuffer,
+                                           xOffset, 0,
+                                           keyRectWidth, keyRectHeight,
+                                           winColor);
+                    } 
+                    
+                    xOffset += keyRectWidth;
+                    
+                    if (stickyInfo.dwFlags & (SKF_LALTLOCKED | SKF_RALTLOCKED)) {
+                        win32DebugDrawRect(&gBackBuffer,
+                                           xOffset, 0,
+                                           keyRectWidth, keyRectToggledHeight,
+                                           altColor);
+                    } else if (stickyInfo.dwFlags & (SKF_LALTLATCHED | SKF_RALTLATCHED)) {
+                        win32DebugDrawRect(&gBackBuffer,
+                                           xOffset, 0,
+                                           keyRectWidth, keyRectHeight,
+                                           altColor);
+                    }
+                }
+                
+                Win32WindowDimension dimension = getWindowDimension(window);
+                HDC deviceContext = GetDC(window);
+                win32DisplayBufferInWindow(&gBackBuffer, deviceContext, 
+                                           dimension.width, dimension.height);
+                ReleaseDC(window, deviceContext);
+            }
+            Sleep(100);
+        }
+    }
+    
     return 0;
+}
+
+void WinMainCRTStartup() {
+    int Result = WinMain(GetModuleHandle(0), 0, 0, 0);
+    ExitProcess(Result);
 }

@@ -60,7 +60,7 @@ command_list = {
 	.footer_panel = false,
 	.save_dirty_files = true,
 	.cursor_at_end = false,
-	.cmd = {{"start /max W:\remedybg.exe W:\MarmotEngine\marmot_debug.rdbg ", .os = "win"},},
+	.cmd = {{"start /max W:\remedybg.exe W:\StickyKeysHelper\misc\marmot.rdbg ", .os = "win"},},
   },
 };
 
